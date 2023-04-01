@@ -97,10 +97,7 @@ def analyze_epoch_time_num_params() -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         label = utils.get_model_size_from_dir(x) + '-'
         # emb_only modifier
-        if 'embedding' in x:
-            label += 'embeddings-only'
-        else:
-            label += 'all-weights'
+        label += 'embeddings-only' if 'embedding' in x else 'all-weights'
         # large with double batch size modifier
         if x.startswith('large_batchsize_128'):
             label += 'large-bs-128'

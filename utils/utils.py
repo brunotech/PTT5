@@ -71,12 +71,13 @@ def tf_events_to_pandas(tb_summary_dir, tag='loss'):
         pandas.DataFrame, containing two pandas.Series: steps and tag
     """
     events = parse_events_files(tb_summary_dir)
-    df = pd.DataFrame({
-        'step': [x.step for x in events[tag]],
-        'wall_time': [x.wall_time for x in events[tag]],
-        tag: [x.value for x in events[tag]]
-    }).sort_values(by='step')
-    return df
+    return pd.DataFrame(
+        {
+            'step': [x.step for x in events[tag]],
+            'wall_time': [x.wall_time for x in events[tag]],
+            tag: [x.value for x in events[tag]],
+        }
+    ).sort_values(by='step')
 
 
 def fix_step_offset(steps):

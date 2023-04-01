@@ -109,7 +109,7 @@ class OutputSplitter(object):
 
     def open(self, filename):
         if self.compress:
-            return bz2.BZ2File(filename + '.bz2', 'w')
+            return bz2.BZ2File(f'{filename}.bz2', 'w')
         else:
             return open(filename, 'w')
 
@@ -144,11 +144,7 @@ def process_dump(input_file, out_file, file_size, file_compress):
     :param file_compress: whether to compress files with bzip.
     """
 
-    if input_file == '-':
-        input = sys.stdin
-    else:
-        input = gzip.open(input_file)
-
+    input = sys.stdin if input_file == '-' else gzip.open(input_file)
     if out_file == '-':
         output = sys.stdout
         if file_compress:
@@ -168,16 +164,16 @@ def process_dump(input_file, out_file, file_size, file_compress):
         index = json.loads(line)
         content = json.loads(input.readline())
         type = index['index']['_type']
-        id = index['index']['_id']
-        language = content['language']
-        revision = content['version']
         if type == 'page' and content['namespace'] == 0:
             title = content['title']
             text = content['text']
             # drop references:
             # ^ The Penguin Dictionary
             text = re.sub(r'  \^ .*', '', text)
-            url = urlbase + 'wiki?curid=' + id
+            id = index['index']['_id']
+            url = f'{urlbase}wiki?curid={id}'
+            language = content['language']
+            revision = content['version']
             header = '<doc id="%s" url="%s" title="%s" language="%s" revision="%s">\n' % (id, url, title, language, revision)
             page = header + title + '\n\n' + text + '\n</doc>\n'
             output.write(page.encode('utf-8'))
@@ -209,9 +205,13 @@ def main():
     groupS = parser.add_argument_group('Special')
     groupS.add_argument("-q", "--quiet", action="store_true",
                         help="suppress reporting progress info")
-    groupS.add_argument("-v", "--version", action="version",
-                        version='%(prog)s ' + version,
-                        help="print program version")
+    groupS.add_argument(
+        "-v",
+        "--version",
+        action="version",
+        version=f'%(prog)s {version}',
+        help="print program version",
+    )
 
     args = parser.parse_args()
 

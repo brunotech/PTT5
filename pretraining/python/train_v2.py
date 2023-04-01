@@ -173,14 +173,14 @@ def get_vocabulary():
         args.spiece_model_path, extra_ids=100)
 
 def get_output_features():
-    if args.spiece_model_path:
-        output_features = {
-                "inputs": Feature(vocabulary=get_vocabulary(), add_eos=True),
-                "targets": Feature(vocabulary=get_vocabulary(), add_eos=True)
-                }
-    else:
-        output_features = t5.data.tasks.DEFAULT_OUTPUT_FEATURES
-    return output_features
+    return (
+        {
+            "inputs": Feature(vocabulary=get_vocabulary(), add_eos=True),
+            "targets": Feature(vocabulary=get_vocabulary(), add_eos=True),
+        }
+        if args.spiece_model_path
+        else t5.data.tasks.DEFAULT_OUTPUT_FEATURES
+    )
 
 t5.data.TaskRegistry.add(
     "denoise",
@@ -239,10 +239,7 @@ def fn_is_var_embedding(x):
     Returns:
         Boolean indicating if the variable is the shared embedding
     """
-    if x.name == 'shared/embedding':
-        return True
-    else:
-        return False
+    return x.name == 'shared/embedding'
 
 # The models from our paper are based on the Mesh Tensorflow Transformer.
 TPU_TOPOLOGY = "2x2"

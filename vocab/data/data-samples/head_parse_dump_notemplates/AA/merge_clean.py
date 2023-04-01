@@ -24,8 +24,6 @@ if __name__=="__main__":
     files = glob.glob("./wiki*")
     cleantext = merge(files)
     sentences = clean_sentences(cleantext)
-    output = open("bn_wiki_sentences.txt", 'w')
-    for line in sentences:
-        output.write(line+"\n")
-
-    output.close()
+    with open("bn_wiki_sentences.txt", 'w') as output:
+        for line in sentences:
+            output.write(line+"\n")

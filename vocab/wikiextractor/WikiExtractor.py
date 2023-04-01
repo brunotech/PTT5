@@ -85,10 +85,10 @@ if PY2:
     class SimpleNamespace(object):
         def __init__ (self, **kwargs):
             self.__dict__.update(kwargs)
-        def __repr__ (self):
+        def __repr__(self):
             keys = sorted(self.__dict__)
             items = ("{}={!r}".format(k, self.__dict__[k]) for k in keys)
-            return "{}({})".format(type(self).__name__, ", ".join(items))
+            return f'{type(self).__name__}({", ".join(items)})'
         def __eq__ (self, other):
             return self.__dict__ == other.__dict__
 else:
@@ -229,17 +229,17 @@ def keepPage(ns, catSet, page):
             if filter_disambig_page_pattern.match(line):
                 return False
     if len(options.filter_category_include) > 0 and len(options.filter_category_include & catSet)==0:
-        logging.debug("***No include  " + str(catSet))
+        logging.debug(f"***No include  {str(catSet)}")
         return False
     if len(options.filter_category_exclude) > 0 and len(options.filter_category_exclude & catSet)>0:
-        logging.debug("***Exclude  " + str(catSet))
+        logging.debug(f"***Exclude  {str(catSet)}")
         return False
     g_page_articl_used_total += 1
     return True
 
 
 def get_url(uid):
-    return "%s?curid=%s" % (options.urlbase, uid)
+    return f"{options.urlbase}?curid={uid}"
 
 
 # =========================================================================
@@ -290,14 +290,10 @@ def normalizeTitle(title):
     # replace sequences of whitespace and underscore chars with a single space
     title = re.sub(r'[\s_]+', ' ', title)
 
-    m = re.match(r'([^:]*):(\s*)(\S(?:.*))', title)
-    if m:
-        prefix = m.group(1)
-        if m.group(2):
-            optionalWhitespace = ' '
-        else:
-            optionalWhitespace = ''
-        rest = m.group(3)
+    if m := re.match(r'([^:]*):(\s*)(\S(?:.*))', title):
+        prefix = m[1]
+        optionalWhitespace = ' ' if m[2] else ''
+        rest = m[3]
 
         ns = normalizeNamespace(prefix)
         if ns in options.knownNamespaces:
@@ -305,7 +301,7 @@ def normalizeTitle(title):
             # followed by optional whitespace that should be removed to get
             # the canonical page name
             # (e.g., "Category:  Births" should become "Category:Births").
-            title = ns + ":" + ucfirst(rest)
+            title = f"{ns}:{ucfirst(rest)}"
         else:
             # No namespace, just capitalize first letter.
             # If the part before the colon is not a known namespace, then we
@@ -314,7 +310,7 @@ def normalizeTitle(title):
             # However, to get the canonical page name we must contract multiple
             # spaces into one, because
             # "3001:   The_Final_Odyssey" != "3001: The_Final_Odyssey".
-            title = ucfirst(prefix) + ":" + optionalWhitespace + ucfirst(rest)
+            title = f"{ucfirst(prefix)}:{optionalWhitespace}{ucfirst(rest)}"
     else:
         # no namespace, just capitalize first letter
         title = ucfirst(title)
@@ -334,10 +330,7 @@ def unescape(text):
         code = m.group(1)
         try:
             if text[1] == "#":  # character reference
-                if text[2] == "x":
-                    return chr(int(code[1:], 16))
-                else:
-                    return chr(int(code))
+                return chr(int(code[1:], 16)) if text[2] == "x" else chr(int(code))
             else:  # named entity
                 return chr(name2codepoint[code])
         except:
@@ -472,11 +465,7 @@ class TemplateArg(object):
 
         parts = splitParts(parameter)
         self.name = Template.parse(parts[0])
-        if len(parts) > 1:
-            # This parameter has a default value
-            self.default = Template.parse(parts[1])
-        else:
-            self.default = None
+        self.default = Template.parse(parts[1]) if len(parts) > 1 else None
 
     def __str__(self):
         if self.default:
@@ -527,9 +516,9 @@ class Frame(object):
         prev = self.prev
         while prev:
             if res: res += ', '
-            res += '(%s, %s)' % (prev.title, prev.args)
+            res += f'({prev.title}, {prev.args})'
             prev = prev.prev
-        return '<Frame [' + res + ']>'
+        return f'<Frame [{res}]>'
 
 # ======================================================================
 
@@ -601,10 +590,7 @@ class Extractor(object):
         logging.info('%s\t%s', self.id, self.title)
 
         # Separate header from text with a newline.
-        if options.toHTML:
-            title_str = '<h1>' + self.title + '</h1>'
-        else:
-            title_str = self.title + '\n'
+        title_str = f'<h1>{self.title}</h1>' if options.toHTML else self.title + '\n'
         # https://www.mediawiki.org/wiki/Help:Magic_words
         colon = self.title.find(':')
         if colon != -1:
@@ -625,10 +611,7 @@ class Extractor(object):
             self.magicWords['BASEPAGENAME'] = pagename
             self.magicWords['SUBPAGENAME'] = ''
         slash = pagename.find('/')
-        if slash != -1:
-            self.magicWords['ROOTPAGENAME'] = pagename[:slash]
-        else:
-            self.magicWords['ROOTPAGENAME'] = pagename
+        self.magicWords['ROOTPAGENAME'] = pagename[:slash] if slash != -1 else pagename
         self.magicWords['CURRENTYEAR'] = time.strftime('%Y')
         self.magicWords['CURRENTMONTH'] = time.strftime('%m')
         self.magicWords['CURRENTDAY'] = time.strftime('%d')
@@ -751,24 +734,14 @@ class Extractor(object):
         Removes irrelevant parts from :param: text.
         """
 
-        # Collect spans
-        spans = []
-        # Drop HTML comments
-        for m in comment.finditer(text):
-            spans.append((m.start(), m.end()))
-
+        spans = [(m.start(), m.end()) for m in comment.finditer(text)]
         # Drop self-closing tags
         for pattern in selfClosing_tag_patterns:
-            for m in pattern.finditer(text):
-                spans.append((m.start(), m.end()))
-
+            spans.extend((m.start(), m.end()) for m in pattern.finditer(text))
         # Drop ignored tags
         for left, right in options.ignored_tag_patterns:
-            for m in left.finditer(text):
-                spans.append((m.start(), m.end()))
-            for m in right.finditer(text):
-                spans.append((m.start(), m.end()))
-
+            spans.extend((m.start(), m.end()) for m in left.finditer(text))
+            spans.extend((m.start(), m.end()) for m in right.finditer(text))
         # Bulk remove all spans
         text = dropSpans(spans, text)
 
@@ -782,11 +755,8 @@ class Extractor(object):
 
         # Expand placeholders
         for pattern, placeholder in placeholder_tag_patterns:
-            index = 1
-            for match in pattern.finditer(text):
+            for index, match in enumerate(pattern.finditer(text), start=1):
                 text = text.replace(match.group(), '%s_%d' % (placeholder, index))
-                index += 1
-
         text = text.replace('<<', '«').replace('>>', '»')
 
         #############################################
@@ -886,37 +856,14 @@ class Extractor(object):
         # the value 'c'.  This case is correctly handled by function 'split',
         # and does not require any special handling.
         for param in parameters:
-            # Spaces before or after a parameter value are normally ignored,
-            # UNLESS the parameter contains a link (to prevent possible gluing
-            # the link to the following text after template substitution)
-
-            # Parameter values may contain "=" symbols, hence the parameter
-            # name extends up to the first such symbol.
-
-            # It is legal for a parameter to be specified several times, in
-            # which case the last assignment takes precedence. Example:
-            # "{{t|a|b|c|2=B}}" is equivalent to "{{t|a|B|c}}".
-            # Therefore, we don't check if the parameter has been assigned a
-            # value before, because anyway the last assignment should override
-            # any previous ones.
-            # FIXME: Don't use DOTALL here since parameters may be tags with
-            # attributes, e.g. <div class="templatequotecite">
-            # Parameters may span several lines, like:
-            # {{Reflist|colwidth=30em|refs=
-            # &lt;ref name=&quot;Goode&quot;&gt;Title&lt;/ref&gt;
-
-            # The '=' might occurr within an HTML attribute:
-            #   "&lt;ref name=value"
-            # but we stop at first.
-            m = re.match(' *([^=]*?) *?=(.*)', param, re.DOTALL)
-            if m:
+            if m := re.match(' *([^=]*?) *?=(.*)', param, re.DOTALL):
                 # This is a named parameter.  This case also handles parameter
                 # assignments like "2=xxx", where the number of an unnamed
                 # parameter ("2") is specified explicitly - this is handled
                 # transparently.
 
-                parameterName = m.group(1).strip()
-                parameterValue = m.group(2)
+                parameterName = m[1].strip()
+                parameterValue = m[2]
 
                 if ']]' not in parameterValue:  # if the value does not contain a link, trim whitespace
                     parameterValue = parameterValue.strip()
@@ -1030,8 +977,7 @@ class Extractor(object):
             self.template_title_errs += 1
             return ''
 
-        redirected = options.redirects.get(title)
-        if redirected:
+        if redirected := options.redirects.get(title):
             title = redirected
 
         # get the template
@@ -1149,8 +1095,7 @@ def splitParts(paramsList):
     cur = 0
 
     for s, e in findMatchingBraces(paramsList):
-        par = paramsList[cur:s].split(sep)
-        if par:
+        if par := paramsList[cur:s].split(sep):
             if parameters:
                 # portion before | belongs to previous parameter
                 parameters[-1] += par[0]
@@ -1164,9 +1109,7 @@ def splitParts(paramsList):
         # add span to last previous parameter
         parameters[-1] += paramsList[s:e]
         cur = e
-    # leftover
-    par = paramsList[cur:].split(sep)
-    if par:
+    if par := paramsList[cur:].split(sep):
         if parameters:
             # portion before | belongs to previous parameter
             parameters[-1] += par[0]
@@ -1232,10 +1175,7 @@ def findMatchingBraces(text, ldelim=0):
         if not m1:
             return
         lmatch = m1.end() - m1.start()
-        if m1.group()[0] == '{':
-            stack = [lmatch]  # stack of opening braces lengths
-        else:
-            stack = [-lmatch]  # negative means [
+        stack = [lmatch] if m1.group()[0] == '{' else [-lmatch]
         end = m1.end()
         while True:
             m2 = reNext.search(text, end)
@@ -1300,7 +1240,10 @@ def findBalanced(text, openDelim=['[['], closeDelim=[']]']):
     """
     openPat = '|'.join([re.escape(x) for x in openDelim])
     # pattern for delimiters expected after each opening delimiter
-    afterPat = {o: re.compile(openPat + '|' + c, re.DOTALL) for o, c in zip(openDelim, closeDelim)}
+    afterPat = {
+        o: re.compile(f'{openPat}|{c}', re.DOTALL)
+        for o, c in zip(openDelim, closeDelim)
+    }
     stack = []
     start = 0
     cur = 0
@@ -1375,10 +1318,7 @@ def if_empty(*rest):
 
     return p   </text>
     """
-    for arg in rest:
-        if arg:
-            return arg
-    return ''
+    return next((arg for arg in rest if arg), '')
 
 
 # ----------------------------------------------------------------------
@@ -1460,13 +1400,12 @@ def string_replace(args):
     replace = params.get('replace', '')
     count = int(params.get('count', 0) or 0)
     plain = int(params.get('plain', 1) or 1)
-    if plain:
-        if count:
-            return source.replace(pattern, replace, count)
-        else:
-            return source.replace(pattern, replace)
-    else:
+    if not plain:
         return re.compile(pattern).sub(replace, source, count)
+    if count:
+        return source.replace(pattern, replace, count)
+    else:
+        return source.replace(pattern, replace)
 
 
 def string_rep(args):
@@ -1511,14 +1450,8 @@ def roman_main(args):
 # ----------------------------------------------------------------------
 
 modules = {
-    'convert': {
-        'convert': lambda x, u, *rest: x + ' ' + u,  # no conversion
-    },
-
-    'If empty': {
-        'main': if_empty
-    },
-
+    'convert': {'convert': lambda x, u, *rest: f'{x} {u}'},
+    'If empty': {'main': if_empty},
     'String': {
         'len': string_len,
         'sub': string_sub,
@@ -1528,14 +1461,8 @@ modules = {
         'replace': string_replace,
         'rep': string_rep,
     },
-
-    'Roman': {
-        'main': roman_main
-    },
-
-    'Numero romano': {
-        'main': roman_main
-    }
+    'Roman': {'main': roman_main},
+    'Numero romano': {'main': roman_main},
 }
 
 # ----------------------------------------------------------------------
@@ -1670,19 +1597,13 @@ def ucfirst(string):
     """:return: a string with just its first character uppercase
     We can't use title() since it coverts all words.
     """
-    if string:
-        return string[0].upper() + string[1:]
-    else:
-        return ''
+    return string[0].upper() + string[1:] if string else ''
 
 
 def lcfirst(string):
     """:return: a string with its first character lowercase"""
     if string:
-        if len(string) > 1:
-            return string[0].lower() + string[1:]
-        else:
-            return string.lower()
+        return string[0].lower() + string[1:] if len(string) > 1 else string.lower()
     else:
         return ''
 
@@ -1695,14 +1616,12 @@ def fullyQualifiedTemplateTitle(templateTitle):
     if templateTitle.startswith(':'):
         # Leading colon by itself implies main namespace, so strip this colon
         return ucfirst(templateTitle[1:])
-    else:
-        m = re.match('([^:]*)(:.*)', templateTitle)
-        if m:
+    if m := re.match('([^:]*)(:.*)', templateTitle):
             # colon found but not in the first position - check if it
             # designates a known namespace
-            prefix = normalizeNamespace(m.group(1))
-            if prefix in options.knownNamespaces:
-                return prefix + ucfirst(m.group(2))
+        prefix = normalizeNamespace(m[1])
+        if prefix in options.knownNamespaces:
+            return prefix + ucfirst(m[2])
     # The title of the page being included is NOT in the main namespace and
     # lacks any other explicit designation of the namespace - therefore, it
     # is resolved to the Template namespace (that's the default for the
@@ -1714,10 +1633,7 @@ def fullyQualifiedTemplateTitle(templateTitle):
     # In this particular case, this page is a redirect to [[Non-nreaking
     # space]], but having in the system a redirect page with an empty title
     # causes numerous problems, so we'll live happier without it.
-    if templateTitle:
-        return options.templatePrefix + ucfirst(templateTitle)
-    else:
-        return ''  # caller may log as error
+    return options.templatePrefix + ucfirst(templateTitle) if templateTitle else ''
 
 
 def normalizeNamespace(ns):
@@ -1771,17 +1687,14 @@ def sharp_expr(extr, expr):
         expr = re.sub('\bround\b', '|ROUND|', expr)
         return text_type(eval(expr))
     except:
-        return '<span class="error">%s</span>' % expr
+        return f'<span class="error">{expr}</span>'
 
 
 def sharp_if(extr, testValue, valueIfTrue, valueIfFalse=None, *args):
     # In theory, we should evaluate the first argument here,
     # but it was evaluated while evaluating part[0] in expandTemplate().
     if testValue.strip():
-        # The {{#if:}} function is an if-then-else construct.
-        # The applied condition is: "The condition string is non-empty".
-        valueIfTrue = extr.expand(valueIfTrue.strip()) # eval
-        if valueIfTrue:
+        if valueIfTrue := extr.expand(valueIfTrue.strip()):
             return valueIfTrue
     elif valueIfFalse:
         return extr.expand(valueIfFalse.strip()) # eval
@@ -1789,8 +1702,7 @@ def sharp_if(extr, testValue, valueIfTrue, valueIfFalse=None, *args):
 
 
 def sharp_ifeq(extr, lvalue, rvalue, valueIfTrue, valueIfFalse=None, *args):
-    rvalue = rvalue.strip()
-    if rvalue:
+    if rvalue := rvalue.strip():
         # lvalue is always evaluated
         if lvalue.strip() == rvalue:
             # The {{#ifeq:}} function is an if-then-else construct. The
@@ -1800,9 +1712,8 @@ def sharp_ifeq(extr, lvalue, rvalue, valueIfTrue, valueIfFalse=None, *args):
 
             if valueIfTrue:
                 return extr.expand(valueIfTrue.strip())
-        else:
-            if valueIfFalse:
-                return extr.expand(valueIfFalse.strip())
+        elif valueIfFalse:
+            return extr.expand(valueIfFalse.strip())
     return ""
 
 
@@ -1861,10 +1772,8 @@ def sharp_switch(extr, primary, *params):
 
 # Extension Scribunto: https://www.mediawiki.org/wiki/Extension:Scribunto
 def sharp_invoke(module, function, args):
-    functions = modules.get(module)
-    if functions:
-        funct = functions.get(function)
-        if funct:
+    if functions := modules.get(module):
+        if funct := functions.get(function):
             return text_type(funct(args))
     return ''
 
@@ -1984,10 +1893,8 @@ def define_template(title, page):
     # sanity check (empty template, e.g. Template:Crude Oil Prices))
     if not page: return
 
-    # check for redirects
-    m = re.match('#REDIRECT.*?\[\[([^\]]*)]]', page[0], re.IGNORECASE)
-    if m:
-        options.redirects[title] = m.group(1)  # normalizeTitle(m.group(1))
+    if m := re.match('#REDIRECT.*?\[\[([^\]]*)]]', page[0], re.IGNORECASE):
+        options.redirects[title] = m[1]
         return
 
     text = unescape(''.join(page))
@@ -2010,15 +1917,13 @@ def define_template(title, page):
     text = re.sub(r'<noinclude\s*>.*$', '', text, flags=re.DOTALL)
     text = re.sub(r'<noinclude/>', '', text)
 
-    onlyincludeAccumulator = ''
-    for m in re.finditer('<onlyinclude>(.*?)</onlyinclude>', text, re.DOTALL):
-        onlyincludeAccumulator += m.group(1)
-    if onlyincludeAccumulator:
-        text = onlyincludeAccumulator
-    else:
-        text = reIncludeonly.sub('', text)
-
-    if text:
+    onlyincludeAccumulator = ''.join(
+        m[1]
+        for m in re.finditer(
+            '<onlyinclude>(.*?)</onlyinclude>', text, re.DOTALL
+        )
+    )
+    if text := onlyincludeAccumulator or reIncludeonly.sub('', text):
         if title in options.templates:
             logging.warn('Redefining: %s', title)
         options.templates[title] = text
@@ -2042,11 +1947,10 @@ def dropNested(text, openDelim, closeDelim):
     next = start
     while end:
         next = openRE.search(text, next.end())
-        if not next:            # termination
+        if not next:    # termination
             while nest:         # close all pending
                 nest -= 1
-                end0 = closeRE.search(text, end.end())
-                if end0:
+                if end0 := closeRE.search(text, end.end()):
                     end = end0
                 else:
                     break
@@ -2060,10 +1964,7 @@ def dropNested(text, openDelim, closeDelim):
                 last = end.end()
                 end = closeRE.search(text, end.end())
                 if not end:     # unbalanced
-                    if spans:
-                        span = (spans[0][0], last)
-                    else:
-                        span = (start.start(), last)
+                    span = (spans[0][0], last) if spans else (start.start(), last)
                     spans = [span]
                     break
             else:
@@ -2116,8 +2017,7 @@ def replaceInternalLinks(text):
     cur = 0
     res = ''
     for s, e in findBalanced(text):
-        m = tailRE.match(text, e)
-        if m:
+        if m := tailRE.match(text, e):
             trail = m.group(0)
             end = m.end()
         else:
@@ -2419,7 +2319,7 @@ def makeInternalLink(title, label):
         if colon2 > 1 and title[colon + 1:colon2] not in options.acceptedNamespaces:
             return ''
     if options.keepLinks:
-        return '<a href="%s">%s</a>' % (quote(title.encode('utf-8')), label)
+        return f"""<a href="{quote(title.encode('utf-8'))}">{label}</a>"""
     else:
         return label
 
@@ -2471,18 +2371,7 @@ def replaceExternalLinks(text):
         url = m.group(1)
         label = m.group(3)
 
-        # # The characters '<' and '>' (which were escaped by
-        # # removeHTMLtags()) should not be included in
-        # # URLs, per RFC 2396.
-        # m2 = re.search('&(lt|gt);', url)
-        # if m2:
-        #     link = url[m2.end():] + ' ' + link
-        #     url = url[0:m2.end()]
-
-        # If the link text is an image URL, replace it with an <img> tag
-        # This happened by accident in the original parser, but some people used it extensively
-        m = EXT_IMAGE_REGEX.match(label)
-        if m:
+        if m := EXT_IMAGE_REGEX.match(label):
             label = makeExternalImage(label)
 
         # Use the encoded URL
@@ -2497,16 +2386,13 @@ def replaceExternalLinks(text):
 def makeExternalLink(url, anchor):
     """Function applied to wikiLinks"""
     if options.keepLinks:
-        return '<a href="%s">%s</a>' % (quote(url.encode('utf-8')), anchor)
+        return f"""<a href="{quote(url.encode('utf-8'))}">{anchor}</a>"""
     else:
         return anchor
 
 
 def makeExternalImage(url, alt=''):
-    if options.keepLinks:
-        return '<img src="%s" alt="%s">' % (url, alt)
-    else:
-        return alt
+    return f'<img src="{url}" alt="{alt}">' if options.keepLinks else alt
 
 
 # ----------------------------------------------------------------------

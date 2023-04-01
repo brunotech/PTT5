@@ -45,9 +45,9 @@ if __name__ == "__main__":
             total = 2448
             assert total % bs == 0, "batch size has to be exactly divisible by total for this test"
 
+            print(f"Used vocabulary: {vocab_name}")
+            print(f"Fixed batch size: {bs}")
             if ENTAIL:
-                print(f"Used vocabulary: {vocab_name}")
-                print(f"Fixed batch size: {bs}")
                 test_dataloader = ASSIN(mode="test",
                                         version='v2',
                                         seq_len=128,
@@ -91,8 +91,6 @@ if __name__ == "__main__":
                 print(f"Final test Macro F1: {macro_f1}")
                 print(f"Final test Accuracy: {accuracy}")
             else:
-                print(f"Used vocabulary: {vocab_name}")
-                print(f"Fixed batch size: {bs}")
                 test_dataloader = ASSIN(mode="test",
                                         version='v2',
                                         seq_len=128,

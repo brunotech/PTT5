@@ -1,6 +1,7 @@
 '''
 Used to re-run validation if needed.
 '''
+
 import torch
 import os
 import argparse
@@ -49,7 +50,7 @@ if __name__ == "__main__":
 
                 result_str = str(best_model.validation_epoch_end(outputs))
                 print(result_str)
-            with open(os.path.join(args.output, os.path.basename(BEST_MODEL_PATH)) + ".txt", 'w') as ftest_file:
+            with open(f"{os.path.join(args.output, os.path.basename(BEST_MODEL_PATH))}.txt", 'w') as ftest_file:
                 ftest_file.write(result_str)
 
     except KeyboardInterrupt:

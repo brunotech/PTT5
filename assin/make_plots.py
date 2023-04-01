@@ -23,7 +23,7 @@ EXPERIMENT_SETS = {"small_long_gen": ("assin2_t5_small_long/version_0", "assin2_
 
 if __name__ == "__main__":
     MODES = ["train", "val", "test"]
-    TAGS = [mode + "_loss" for mode in MODES]
+    TAGS = [f"{mode}_loss" for mode in MODES]
 
     BS = {"base": 32, "small": 2, "large": 1}
     SIZE = {"train": 6500, "val": 500, "test": 2448}
@@ -48,11 +48,7 @@ if __name__ == "__main__":
         for mode in ["train", "val"]:
             experiment_dir = os.path.join(args.log_folder, experiment)
 
-            if args.val_acc and mode == "val":
-                metric_name = "val_acc"
-            else:
-                metric_name = f"{mode}_loss"
-
+            metric_name = "val_acc" if args.val_acc and mode == "val" else f"{mode}_loss"
             if "t5" in experiment.split('_'):
                 if "long" in experiment or "acc" in experiment:
                     label = f"{metric_name.replace('_', ' ')} linear layer"

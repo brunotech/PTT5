@@ -97,7 +97,7 @@ class T5ASSIN(pl.LightningModule):
         if self.hparams.model_name[:2] == "pt":
             logging.info("Initializing from PTT5 checkpoint...")
             config, state_dict = self.get_ptt5()
-            if self.hparams.architecture == "gen" or self.hparams.architecture == "categoric_gen":
+            if self.hparams.architecture in ["gen", "categoric_gen"]:
                 self.t5 = T5ForConditionalGeneration.from_pretrained(pretrained_model_name_or_path=None,
                                                                      config=config,
                                                                      state_dict=state_dict)
@@ -107,7 +107,7 @@ class T5ASSIN(pl.LightningModule):
                                                   state_dict=state_dict)
         else:
             logging.info("Initializing from T5 checkpoint...")
-            if self.hparams.architecture == "gen" or self.hparams.architecture == "categoric_gen":
+            if self.hparams.architecture in ["gen", "categoric_gen"]:
                 self.t5 = T5ForConditionalGeneration.from_pretrained(self.hparams.model_name)
             else:
                 self.t5 = T5Model.from_pretrained(self.hparams.model_name)
@@ -118,14 +118,14 @@ class T5ASSIN(pl.LightningModule):
             # Replace T5 with a simple nonlinear input
             self.t5 = NONLinearInput(self.hparams.seq_len, D)
 
-        if self.hparams.architecture != "gen" and self.hparams.architecture != "categoric_gen":
+        if self.hparams.architecture not in ["gen", "categoric_gen"]:
             if self.hparams.architecture == "categoric":
                 assert self.hparams.nout != 1, "Categoric mode with 1 nout doesn't work with CrossEntropyLoss"
                 self.linear = nn.Linear(D, self.hparams.nout)
             else:
                 self.linear = nn.Linear(D, 1)
 
-        if self.hparams.architecture == "categoric" or self.hparams.architecture == "categoric_gen":
+        if self.hparams.architecture in ["categoric", "categoric_gen"]:
             self.loss = nn.CrossEntropyLoss()
         else:
             self.loss = nn.MSELoss()
@@ -135,8 +135,12 @@ class T5ASSIN(pl.LightningModule):
         logging.info("Initialization done.")
 
     def get_ptt5(self):
-        ckpt_paths = glob(os.path.join(self.hparams.checkpoint_path, self.hparams.model_name + "*"))
-        config_paths = glob(os.path.join(CONFIG_PATH, "ptt5*" + self.size + "*"))
+        ckpt_paths = glob(
+            os.path.join(
+                self.hparams.checkpoint_path, f"{self.hparams.model_name}*"
+            )
+        )
+        config_paths = glob(os.path.join(CONFIG_PATH, f"ptt5*{self.size}*"))
 
         assert len(ckpt_paths) == 1 and len(config_paths) == 1, ("Are the config/ckpts on the correct path?"
                                                                  f"{ckpt_paths} {config_paths}")
@@ -160,7 +164,7 @@ class T5ASSIN(pl.LightningModule):
             return self.linear(self.t5(input_ids=input_ids,
                                        decoder_input_ids=input_ids,
                                        attention_mask=attention_mask)[0].mean(dim=1))
-        elif self.hparams.architecture == "gen" or self.hparams.architecture == "categoric_gen":
+        elif self.hparams.architecture in ["gen", "categoric_gen"]:
             if self.training:
                 return self.t5(input_ids=input_ids,
                                attention_mask=attention_mask,
@@ -178,15 +182,13 @@ class T5ASSIN(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         input_ids, attention_mask, y, original_number = batch
 
-        if self.hparams.architecture == "gen" or self.hparams.architecture == "categoric_gen":
+        if self.hparams.architecture in ["gen", "categoric_gen"]:
             loss = self(batch)
         else:
             y_hat = self(batch).squeeze(-1)
             loss = self.loss(y_hat, original_number)
 
-        ret_dict = {'loss': loss}
-
-        return ret_dict
+        return {'loss': loss}
 
     def validation_step(self, batch, batch_idx):
         input_ids, attention_mask, y, original_number = batch
@@ -210,7 +212,7 @@ class T5ASSIN(pl.LightningModule):
                         pass
 
             loss = self.loss(y_hat, original_number)
-            ret_dict = {'loss': loss}
+            return {'loss': loss}
         elif self.hparams.architecture == "categoric_gen":  # not able to calculate loss in validation using categoric generation
             pred_tokens = self(batch)
             string_y_hat = [self.tokenizer.decode(pred).strip() for pred in pred_tokens]
@@ -218,28 +220,26 @@ class T5ASSIN(pl.LightningModule):
 
             acc = torch.Tensor([str_y_hat == str_y for str_y_hat, str_y in zip(string_y_hat, string_y)]).float().mean()
 
-            ret_dict = {'acc': acc}
+            return {'acc': acc}
         elif self.hparams.architecture == "categoric":  # cross entropy loss and accuracy are returned
             y_hat = self(batch)
             loss = self.loss(y_hat, original_number)
             acc = (y_hat.argmax(dim=1).eq(original_number)).float().mean()
-            ret_dict = {'loss': loss, 'acc': acc}
+            return {'loss': loss, 'acc': acc}
         else:  # default, linear layer activation
             y_hat = self(batch).squeeze(-1)
             loss = self.loss(y_hat, original_number)
             self.pearson_calculator(y_hat.detach().cpu().numpy(), original_number.cpu().numpy())
-            ret_dict = {'loss': loss}
-
-        return ret_dict
+            return {'loss': loss}
 
     def training_epoch_end(self, outputs):
         name = "train_"
 
         loss = torch.stack([x['loss'] for x in outputs]).mean()
 
-        logs = {name + "loss": loss}
+        logs = {f"{name}loss": loss}
 
-        return {name + 'loss': loss, 'log': logs, 'progress_bar': logs}
+        return {f'{name}loss': loss, 'log': logs, 'progress_bar': logs}
 
     def validation_epoch_end(self, outputs):
         name = "val_"
@@ -248,19 +248,24 @@ class T5ASSIN(pl.LightningModule):
             loss = torch.stack([x['loss'] for x in outputs]).mean()
             acc = torch.stack([x['acc'] for x in outputs]).mean()
 
-            logs = {name + "loss": loss, name + "acc": acc}
-            return {name + 'loss': loss, name + 'acc': acc, 'log': logs, 'progress_bar': logs}
+            logs = {f"{name}loss": loss, f"{name}acc": acc}
+            return {
+                f'{name}loss': loss,
+                f'{name}acc': acc,
+                'log': logs,
+                'progress_bar': logs,
+            }
         elif self.hparams.architecture == "categoric_gen":  # only acc
             acc = torch.stack([x['acc'] for x in outputs]).mean()
 
-            logs = {name + "acc": acc}
-            return {name + 'acc': acc, 'log': logs, 'progress_bar': logs}
+            logs = {f"{name}acc": acc}
+            return {f'{name}acc': acc, 'log': logs, 'progress_bar': logs}
         else:
             loss = torch.stack([x['loss'] for x in outputs]).mean()
             pearson = self.pearson_calculator.calculate_pearson()
 
-            logs = {name + "loss": loss, name + "pearson": pearson}
-            return {name + 'loss': loss, 'log': logs, 'progress_bar': logs}
+            logs = {f"{name}loss": loss, f"{name}pearson": pearson}
+            return {f'{name}loss': loss, 'log': logs, 'progress_bar': logs}
 
     def configure_optimizers(self):
         return RAdam(self.parameters(), lr=self.hparams.lr)

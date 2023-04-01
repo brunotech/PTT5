@@ -153,7 +153,7 @@ if __name__ == "__main__":
         print(f"\n{mode} dataset length: {len(dataset)}\n")
         print("Random sample")
         input_ids, attention_mask, target, original_number = random.choice(dataset)
-        print(str((input_ids, attention_mask, target, original_number)))
+        print((input_ids, attention_mask, target, original_number))
 
     # Testing dataloaders
     shuffle = {"train": True, "validation": False, "test": False}
